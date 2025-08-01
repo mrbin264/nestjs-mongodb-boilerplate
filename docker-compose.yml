@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: boilerplate-mongodb
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_DATABASE: boilerplate-dev
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/mongodb/init-scripts:/docker-entrypoint-initdb.d:ro
+    networks:
+      - boilerplate-network
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: boilerplate-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - boilerplate-network
+
+  # MongoDB Admin UI (optional)
+  mongo-express:
+    image: mongo-express:1.0.0-alpha
+    container_name: boilerplate-mongo-express
+    restart: unless-stopped
+    ports:
+      - '8081:8081'
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: admin123
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin123
+    depends_on:
+      - mongodb
+    networks:
+      - boilerplate-network
+
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  boilerplate-network:
+    driver: bridge
