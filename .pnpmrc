@@ -1,0 +1,5 @@
+node-linker=hoisted
+hoist-pattern[]=*eslint*
+hoist-pattern[]=*prettier*
+auto-install-peers=true
+strict-peer-dependencies=false
