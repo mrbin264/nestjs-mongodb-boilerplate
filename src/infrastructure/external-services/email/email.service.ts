@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { 
@@ -10,20 +10,35 @@ import {
 @Injectable()
 export class EmailService implements IEmailService {
   private transporter!: nodemailer.Transporter;
+  private readonly logger = new Logger(EmailService.name);
 
   constructor(private readonly configService: ConfigService) {
     this.createTransporter();
   }
 
   private createTransporter(): void {
-    const host = this.configService.get<string>('SMTP_HOST');
-    const port = this.configService.get<number>('SMTP_PORT', 587);
+    // Support both SMTP_* and EMAIL_SERVICE_* environment variables
+    const host = this.configService.get<string>('SMTP_HOST') || 
+                 this.configService.get<string>('EMAIL_SERVICE_HOST');
+    const port = this.configService.get<number>('SMTP_PORT') || 
+                 this.configService.get<number>('EMAIL_SERVICE_PORT', 587);
     const secure = this.configService.get<boolean>('SMTP_SECURE', false);
-    const user = this.configService.get<string>('SMTP_USER');
-    const pass = this.configService.get<string>('SMTP_PASS');
+    const user = this.configService.get<string>('SMTP_USER') || 
+                 this.configService.get<string>('EMAIL_SERVICE_USER');
+    const pass = this.configService.get<string>('SMTP_PASS') || 
+                 this.configService.get<string>('EMAIL_SERVICE_PASS');
 
+    // In development, create a mock transporter if SMTP is not configured
+    const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+    
     if (!host || !user || !pass) {
-      throw new Error('SMTP configuration is incomplete');
+      if (nodeEnv === 'development') {
+        this.logger.warn('SMTP configuration is incomplete. Using mock email service for development.');
+        this.createMockTransporter();
+        return;
+      } else {
+        throw new Error('SMTP configuration is incomplete. Please set EMAIL_SERVICE_HOST, EMAIL_SERVICE_USER, and EMAIL_SERVICE_PASS environment variables.');
+      }
     }
 
     this.transporter = nodemailer.createTransport({
@@ -37,9 +52,21 @@ export class EmailService implements IEmailService {
     });
   }
 
+  private createMockTransporter(): void {
+    // Create a mock transporter for development
+    this.transporter = nodemailer.createTransport({
+      streamTransport: true,
+      newline: 'unix',
+      buffer: true,
+    });
+  }
+
   async sendEmail(options: EmailOptions): Promise<void> {
+    const from = this.configService.get<string>('SMTP_FROM_EMAIL') || 
+                 this.configService.get<string>('EMAIL_SERVICE_FROM', 'noreply@example.com');
+    
     const mailOptions = {
-      from: this.configService.get<string>('SMTP_FROM_EMAIL', 'noreply@example.com'),
+      from,
       to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
       subject: options.subject,
       html: options.html,
@@ -48,8 +75,16 @@ export class EmailService implements IEmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      const info = await this.transporter.sendMail(mailOptions);
+      
+      // Log for development when using mock transporter
+      const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+      if (nodeEnv === 'development' && info.envelope) {
+        this.logger.log(`📧 Mock email sent to: ${mailOptions.to}`);
+        this.logger.log(`📧 Subject: ${mailOptions.subject}`);
+      }
     } catch (error) {
+      this.logger.error(`Failed to send email: ${(error as Error).message}`);
       throw new Error(`Failed to send email: ${(error as Error).message}`);
     }
   }

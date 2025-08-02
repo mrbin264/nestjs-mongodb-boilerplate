@@ -34,14 +34,14 @@ import { CoreModule } from './core.module';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
-        const secret = configService.get<string>('jwt.secret');
+        const secret = configService.get<string>('auth.jwtSecret');
         if (!secret) {
           throw new Error('JWT_SECRET is not defined');
         }
         return {
           secret,
           signOptions: {
-            expiresIn: configService.get<string>('jwt.expiresIn', '15m'),
+            expiresIn: configService.get<string>('auth.jwtExpiresIn', '15m'),
           },
         };
       },

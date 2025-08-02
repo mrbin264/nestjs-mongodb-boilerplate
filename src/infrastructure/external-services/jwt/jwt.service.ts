@@ -19,15 +19,15 @@ export class JwtService implements IJwtService {
       type: 'access',
     };
 
-    const accessTokenSecret = this.configService.get<string>('JWT_ACCESS_TOKEN_SECRET');
-    const refreshTokenSecret = this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET');
+    const accessTokenSecret = this.configService.get<string>('auth.jwtSecret');
+    const refreshTokenSecret = this.configService.get<string>('auth.refreshSecret');
     
     if (!accessTokenSecret || !refreshTokenSecret) {
       throw new Error('JWT secrets not configured');
     }
 
     const accessToken = this.nestJwtService.sign(payload, {
-      expiresIn: this.configService.get<string>('JWT_ACCESS_TOKEN_EXPIRATION', '15m'),
+      expiresIn: this.configService.get<string>('auth.jwtExpiresIn', '15m'),
       secret: accessTokenSecret,
     });
 
@@ -39,7 +39,7 @@ export class JwtService implements IJwtService {
     };
 
     const refreshToken = this.nestJwtService.sign(refreshTokenPayload, {
-      expiresIn: this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRATION', '7d'),
+      expiresIn: this.configService.get<string>('auth.refreshExpiresIn', '7d'),
       secret: refreshTokenSecret,
     });
 
@@ -47,7 +47,7 @@ export class JwtService implements IJwtService {
       accessToken,
       refreshToken,
       expiresIn: this.parseExpirationToSeconds(
-        this.configService.get<string>('JWT_ACCESS_TOKEN_EXPIRATION', '15m')
+        this.configService.get<string>('auth.jwtExpiresIn', '15m')
       ),
     };
   }
@@ -60,13 +60,13 @@ export class JwtService implements IJwtService {
       type: 'access',
     };
 
-    const secret = this.configService.get<string>('JWT_ACCESS_TOKEN_SECRET');
+    const secret = this.configService.get<string>('auth.jwtSecret');
     if (!secret) {
       throw new Error('JWT access token secret not configured');
     }
 
     return this.nestJwtService.sign(payload, {
-      expiresIn: this.configService.get<string>('JWT_ACCESS_TOKEN_EXPIRATION', '15m'),
+      expiresIn: this.configService.get<string>('auth.jwtExpiresIn', '15m'),
       secret,
     });
   }
@@ -79,20 +79,20 @@ export class JwtService implements IJwtService {
       type: 'refresh',
     };
 
-    const secret = this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET');
+    const secret = this.configService.get<string>('auth.refreshSecret');
     if (!secret) {
       throw new Error('JWT refresh token secret not configured');
     }
 
     return this.nestJwtService.sign(payload, {
-      expiresIn: this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRATION', '7d'),
+      expiresIn: this.configService.get<string>('auth.refreshExpiresIn', '7d'),
       secret,
     });
   }
 
   verifyAccessToken(token: string): JwtPayload {
     try {
-      const secret = this.configService.get<string>('JWT_ACCESS_TOKEN_SECRET');
+      const secret = this.configService.get<string>('auth.jwtSecret');
       if (!secret) {
         throw new Error('JWT access token secret not configured');
       }
@@ -105,7 +105,7 @@ export class JwtService implements IJwtService {
 
   verifyRefreshToken(token: string): JwtPayload {
     try {
-      const secret = this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET');
+      const secret = this.configService.get<string>('auth.refreshSecret');
       if (!secret) {
         throw new Error('JWT refresh token secret not configured');
       }

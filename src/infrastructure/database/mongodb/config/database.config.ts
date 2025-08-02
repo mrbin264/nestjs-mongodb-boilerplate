@@ -7,10 +7,10 @@ export class DatabaseConfig implements MongooseOptionsFactory {
   constructor(private configService: ConfigService) {}
 
   createMongooseOptions(): MongooseModuleOptions {
-    const uri = this.configService.get<string>('MONGODB_URI');
+    const uri = this.configService.get<string>('DATABASE_URL');
     
     if (!uri) {
-      throw new Error('MONGODB_URI is not configured');
+      throw new Error('DATABASE_URL is not configured');
     }
 
     return {

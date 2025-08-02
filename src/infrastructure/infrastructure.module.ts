@@ -48,14 +48,14 @@ export const EMAIL_SERVICE = 'EMAIL_SERVICE';
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         secret: (() => {
-          const secret = configService.get<string>('JWT_SECRET');
+          const secret = configService.get<string>('auth.jwtSecret');
           if (!secret) {
             throw new Error('JWT_SECRET is not defined in environment variables');
           }
           return secret;
         })(),
         signOptions: {
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '15m'),
+          expiresIn: configService.get<string>('auth.jwtExpiresIn', '15m'),
         },
       }),
       inject: [ConfigService],
