@@ -7,8 +7,10 @@ import {
   HealthCheckResult,
   HealthIndicatorResult,
 } from '@nestjs/terminus';
+import { Public } from '../decorators/public.decorator';
 
 @Controller('health')
+@Public() // Make entire health controller public
 export class HealthController {
   constructor(
     private health: HealthCheckService,
