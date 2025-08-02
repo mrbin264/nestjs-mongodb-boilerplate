@@ -34,12 +34,12 @@ export interface IJwtService {
   /**
    * Verify access token and return payload
    */
-  verifyAccessToken(token: string): JwtPayload;
+  verifyAccessToken(token: string): Promise<JwtPayload>;
 
   /**
    * Verify refresh token and return payload
    */
-  verifyRefreshToken(token: string): JwtPayload;
+  verifyRefreshToken(token: string): Promise<JwtPayload>;
 
   /**
    * Decode token without verification (for getting payload info)

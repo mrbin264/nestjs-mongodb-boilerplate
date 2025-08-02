@@ -90,7 +90,7 @@ export class JwtService implements IJwtService {
     });
   }
 
-  verifyAccessToken(token: string): JwtPayload {
+  async verifyAccessToken(token: string): Promise<JwtPayload> {
     try {
       const secret = this.configService.get<string>('auth.jwtSecret');
       if (!secret) {
@@ -103,7 +103,7 @@ export class JwtService implements IJwtService {
     }
   }
 
-  verifyRefreshToken(token: string): JwtPayload {
+  async verifyRefreshToken(token: string): Promise<JwtPayload> {
     try {
       const secret = this.configService.get<string>('auth.refreshSecret');
       if (!secret) {
