@@ -1,7 +1,15 @@
 import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
+  @ApiProperty({
+    description: 'Updated first name',
+    example: 'John',
+    required: false,
+    minLength: 1,
+    maxLength: 50,
+  })
   @IsOptional()
   @IsString({ message: 'First name must be a string' })
   @MinLength(1, { message: 'First name cannot be empty' })
@@ -9,6 +17,13 @@ export class UpdateProfileDto {
   @Transform(({ value }) => value?.trim())
   readonly firstName?: string;
 
+  @ApiProperty({
+    description: 'Updated last name',
+    example: 'Smith',
+    required: false,
+    minLength: 1,
+    maxLength: 50,
+  })
   @IsOptional()
   @IsString({ message: 'Last name must be a string' })
   @MinLength(1, { message: 'Last name cannot be empty' })
@@ -16,6 +31,13 @@ export class UpdateProfileDto {
   @Transform(({ value }) => value?.trim())
   readonly lastName?: string;
 
+  @ApiProperty({
+    description: 'Updated phone number',
+    example: '+1-555-987-6543',
+    required: false,
+    minLength: 10,
+    maxLength: 15,
+  })
   @IsOptional()
   @IsString({ message: 'Phone must be a string' })
   @MinLength(10, { message: 'Phone must be at least 10 characters' })
@@ -23,6 +45,12 @@ export class UpdateProfileDto {
   @Transform(({ value }) => value?.trim())
   readonly phone?: string;
 
+  @ApiProperty({
+    description: 'Updated avatar URL',
+    example: 'https://example.com/avatar/john-smith.jpg',
+    required: false,
+    maxLength: 500,
+  })
   @IsOptional()
   @IsString({ message: 'Avatar must be a string' })
   @MaxLength(500, { message: 'Avatar URL cannot exceed 500 characters' })
