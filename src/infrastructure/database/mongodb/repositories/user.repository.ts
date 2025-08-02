@@ -42,20 +42,22 @@ export class UserRepository implements IUserRepository {
     const userData = this.mapDomainToMongo(user);
     
     if (userData._id) {
-      // Update existing user
+      // Try to update existing user first
       const updated = await this.userModel.findByIdAndUpdate(
         userData._id,
         { $set: userData },
         { new: true, runValidators: true }
       ).exec();
       
-      if (!updated) {
-        throw new Error('User not found for update');
+      if (updated) {
+        return this.mapMongoToDomain(updated);
       }
       
-      return this.mapMongoToDomain(updated);
+      // If user doesn't exist, create new user with the provided ID
+      const created = await this.userModel.create(userData);
+      return this.mapMongoToDomain(created);
     } else {
-      // Create new user
+      // Create new user without ID (let MongoDB generate it)
       const created = await this.userModel.create(userData);
       return this.mapMongoToDomain(created);
     }
