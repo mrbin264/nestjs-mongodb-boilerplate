@@ -62,5 +62,5 @@ export interface IEmailService {
   /**
    * Test email configuration
    */
-  testConnection(): Promise<boolean>;
+//   testConnection(): Promise<boolean>;
 }
