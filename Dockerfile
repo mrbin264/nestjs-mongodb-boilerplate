@@ -1,5 +1,5 @@
 # Dockerfile for production deployment
-FROM node:18-alpine AS base
+FROM node:22-alpine AS base
 
 # Install pnpm
 RUN npm install -g pnpm@8.15.0
@@ -28,7 +28,7 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm run build
 
 # Production stage
-FROM node:18-alpine AS production
+FROM node:22-alpine AS production
 
 # Install pnpm
 RUN npm install -g pnpm@8.15.0
