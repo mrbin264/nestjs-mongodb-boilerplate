@@ -17,7 +17,7 @@ import { RefreshTokenRepository } from './database/mongodb/repositories/refresh-
 import { PasswordResetTokenRepository } from './database/mongodb/repositories/password-reset-token.repository';
 
 // External Services
-import { TokenService } from './external-services/token/token.service';
+import { JwtService } from './external-services/jwt/jwt.service';
 import { HashService } from './external-services/hash/hash.service';
 import { EmailService } from './external-services/email/email.service';
 
@@ -83,7 +83,7 @@ export const EMAIL_SERVICE = 'EMAIL_SERVICE';
     // External Services
     {
       provide: JWT_SERVICE,
-      useClass: TokenService,
+      useClass: JwtService,
     },
     {
       provide: HASH_SERVICE,
