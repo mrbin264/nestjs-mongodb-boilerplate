@@ -1,35 +1,39 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
-import { 
-  IEmailService, 
-  EmailOptions, 
-  EmailTemplate 
-} from '../../../domain/services/email.service.interface';
+import { IEmailService } from '../../../domain/services/email.service.interface';
 
 @Injectable()
 export class EmailService implements IEmailService {
-  private transporter!: nodemailer.Transporter;
+  private readonly logger = new Logger(EmailService.name);
+  private transporter: nodemailer.Transporter;
 
   constructor(private readonly configService: ConfigService) {
-    this.createTransporter();
+    this.transporter = this.createTransporter();
   }
 
-  private createTransporter(): void {
-    const host = this.configService.get<string>('SMTP_HOST');
-    const port = this.configService.get<number>('SMTP_PORT', 587);
-    const secure = this.configService.get<boolean>('SMTP_SECURE', false);
-    const user = this.configService.get<string>('SMTP_USER');
-    const pass = this.configService.get<string>('SMTP_PASS');
+  private createTransporter(): nodemailer.Transporter {
+    // Try to get SMTP configuration from multiple possible env var formats
+    const host = this.configService.get<string>('SMTP_HOST') || this.configService.get<string>('EMAIL_SERVICE_HOST');
+    const port = this.configService.get<number>('SMTP_PORT') || this.configService.get<number>('EMAIL_SERVICE_PORT');
+    const user = this.configService.get<string>('SMTP_USER') || this.configService.get<string>('EMAIL_SERVICE_USER');
+    const pass = this.configService.get<string>('SMTP_PASS') || this.configService.get<string>('EMAIL_SERVICE_PASS');
 
+    // If SMTP is not configured, use a mock transporter for development
     if (!host || !user || !pass) {
-      throw new Error('SMTP configuration is incomplete');
+      this.logger.warn('SMTP configuration not found. Using mock email service for development.');
+      return nodemailer.createTransporter({
+        streamTransport: true,
+        newline: 'unix',
+        buffer: true,
+      });
     }
 
-    this.transporter = nodemailer.createTransport({
+    this.logger.log('Configuring SMTP email service');
+    return nodemailer.createTransporter({
       host,
-      port,
-      secure,
+      port: port || 587,
+      secure: false,
       auth: {
         user,
         pass,
@@ -37,271 +41,66 @@ export class EmailService implements IEmailService {
     });
   }
 
-  async sendEmail(options: EmailOptions): Promise<void> {
-    const mailOptions = {
-      from: this.configService.get<string>('SMTP_FROM_EMAIL', 'noreply@example.com'),
-      to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
-      subject: options.subject,
-      html: options.html,
-      text: options.text,
-      attachments: options.attachments,
-    };
-
+  async sendEmail(to: string, subject: string, html: string): Promise<void> {
     try {
-      await this.transporter.sendMail(mailOptions);
+      const from = this.configService.get<string>('SMTP_FROM') || this.configService.get<string>('EMAIL_SERVICE_FROM') || 'noreply@yourapp.com';
+      
+      const info = await this.transporter.sendMail({
+        from,
+        to,
+        subject,
+        html,
+      });
+
+      // If using mock transporter, log the email content
+      if (info.message) {
+        this.logger.log(`Mock email sent to ${to}: ${subject}`);
+        this.logger.debug(`Email content: ${info.message.toString()}`);
+      } else {
+        this.logger.log(`Email sent successfully to ${to}`);
+      }
     } catch (error) {
+      this.logger.error(`Failed to send email to ${to}:`, error);
       throw new Error(`Failed to send email: ${(error as Error).message}`);
     }
   }
 
-  async sendWelcomeEmail(to: string, name: string, verificationToken?: string): Promise<void> {
-    const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000');
-    const verificationUrl = verificationToken 
-      ? `${appUrl}/verify-email?token=${verificationToken}`
-      : null;
-
+  async sendWelcomeEmail(to: string, name: string): Promise<void> {
+    const subject = 'Welcome to Our Platform!';
     const html = `
-      <h1>Welcome to our platform, ${name}!</h1>
-      <p>Thank you for joining us. We're excited to have you on board.</p>
-      ${verificationUrl ? `
-        <p>Please verify your email address by clicking the link below:</p>
-        <a href="${verificationUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify Email</a>
-        <p>Or copy and paste this link into your browser: ${verificationUrl}</p>
-      ` : ''}
-      <p>If you have any questions, feel free to contact our support team.</p>
-      <p>Best regards,<br>The Team</p>
+      <h1>Welcome, ${name}!</h1>
+      <p>Thank you for joining our platform.</p>
+      <p>We're excited to have you on board!</p>
     `;
 
-    const text = `
-      Welcome to our platform, ${name}!
-      
-      Thank you for joining us. We're excited to have you on board.
-      
-      ${verificationUrl ? `Please verify your email address by visiting: ${verificationUrl}` : ''}
-      
-      If you have any questions, feel free to contact our support team.
-      
-      Best regards,
-      The Team
-    `;
-
-    await this.sendEmail({
-      to,
-      subject: 'Welcome to our platform!',
-      html,
-      text,
-    });
+    await this.sendEmail(to, subject, html);
   }
 
-  async sendEmailVerification(to: string, name: string, verificationToken: string): Promise<void> {
-    const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000');
-    const verificationUrl = `${appUrl}/verify-email?token=${verificationToken}`;
-
+  async sendPasswordResetEmail(to: string, resetToken: string): Promise<void> {
+    const resetUrl = `${this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000')}/reset-password?token=${resetToken}`;
+    const subject = 'Password Reset Request';
     const html = `
-      <h1>Verify Your Email Address</h1>
-      <p>Hello ${name},</p>
-      <p>Please verify your email address by clicking the link below:</p>
-      <a href="${verificationUrl}" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify Email</a>
-      <p>Or copy and paste this link into your browser: ${verificationUrl}</p>
-      <p>This link will expire in 24 hours.</p>
-      <p>If you didn't request this verification, please ignore this email.</p>
-      <p>Best regards,<br>The Team</p>
-    `;
-
-    const text = `
-      Verify Your Email Address
-      
-      Hello ${name},
-      
-      Please verify your email address by visiting: ${verificationUrl}
-      
-      This link will expire in 24 hours.
-      
-      If you didn't request this verification, please ignore this email.
-      
-      Best regards,
-      The Team
-    `;
-
-    await this.sendEmail({
-      to,
-      subject: 'Verify Your Email Address',
-      html,
-      text,
-    });
-  }
-
-  async sendPasswordResetEmail(to: string, name: string, resetToken: string): Promise<void> {
-    const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000');
-    const resetUrl = `${appUrl}/reset-password?token=${resetToken}`;
-
-    const html = `
-      <h1>Reset Your Password</h1>
-      <p>Hello ${name},</p>
-      <p>You requested a password reset. Click the link below to reset your password:</p>
-      <a href="${resetUrl}" style="background-color: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
-      <p>Or copy and paste this link into your browser: ${resetUrl}</p>
+      <h1>Password Reset Request</h1>
+      <p>You have requested to reset your password.</p>
+      <p>Click the link below to reset your password:</p>
+      <a href="${resetUrl}">Reset Password</a>
       <p>This link will expire in 1 hour.</p>
-      <p>If you didn't request a password reset, please ignore this email and your password will remain unchanged.</p>
-      <p>Best regards,<br>The Team</p>
+      <p>If you did not request this password reset, please ignore this email.</p>
     `;
 
-    const text = `
-      Reset Your Password
-      
-      Hello ${name},
-      
-      You requested a password reset. Visit this link to reset your password: ${resetUrl}
-      
-      This link will expire in 1 hour.
-      
-      If you didn't request a password reset, please ignore this email and your password will remain unchanged.
-      
-      Best regards,
-      The Team
-    `;
-
-    await this.sendEmail({
-      to,
-      subject: 'Reset Your Password',
-      html,
-      text,
-    });
+    await this.sendEmail(to, subject, html);
   }
 
-  async sendPasswordChangedNotification(to: string, name: string): Promise<void> {
+  async sendEmailVerification(to: string, verificationToken: string): Promise<void> {
+    const verificationUrl = `${this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000')}/verify-email?token=${verificationToken}`;
+    const subject = 'Email Verification';
     const html = `
-      <h1>Password Changed Successfully</h1>
-      <p>Hello ${name},</p>
-      <p>Your password has been successfully changed.</p>
-      <p>If you didn't make this change, please contact our support team immediately.</p>
-      <p>For your security, we recommend:</p>
-      <ul>
-        <li>Using a strong, unique password</li>
-        <li>Enabling two-factor authentication if available</li>
-        <li>Regularly monitoring your account activity</li>
-      </ul>
-      <p>Best regards,<br>The Team</p>
+      <h1>Email Verification</h1>
+      <p>Please verify your email address by clicking the link below:</p>
+      <a href="${verificationUrl}">Verify Email</a>
+      <p>This link will expire in 24 hours.</p>
     `;
 
-    const text = `
-      Password Changed Successfully
-      
-      Hello ${name},
-      
-      Your password has been successfully changed.
-      
-      If you didn't make this change, please contact our support team immediately.
-      
-      For your security, we recommend:
-      - Using a strong, unique password
-      - Enabling two-factor authentication if available
-      - Regularly monitoring your account activity
-      
-      Best regards,
-      The Team
-    `;
-
-    await this.sendEmail({
-      to,
-      subject: 'Password Changed Successfully',
-      html,
-      text,
-    });
-  }
-
-  async sendAccountLockedNotification(to: string, name: string, reason: string): Promise<void> {
-    const html = `
-      <h1>Account Locked</h1>
-      <p>Hello ${name},</p>
-      <p>Your account has been temporarily locked.</p>
-      <p><strong>Reason:</strong> ${reason}</p>
-      <p>If you believe this is an error or need assistance, please contact our support team.</p>
-      <p>Best regards,<br>The Team</p>
-    `;
-
-    const text = `
-      Account Locked
-      
-      Hello ${name},
-      
-      Your account has been temporarily locked.
-      
-      Reason: ${reason}
-      
-      If you believe this is an error or need assistance, please contact our support team.
-      
-      Best regards,
-      The Team
-    `;
-
-    await this.sendEmail({
-      to,
-      subject: 'Account Locked',
-      html,
-      text,
-    });
-  }
-
-  async sendSecurityAlert(to: string, name: string, alertType: string, details: string): Promise<void> {
-    const html = `
-      <h1>Security Alert</h1>
-      <p>Hello ${name},</p>
-      <p>We detected unusual activity on your account.</p>
-      <p><strong>Alert Type:</strong> ${alertType}</p>
-      <p><strong>Details:</strong> ${details}</p>
-      <p>If this was you, no action is required. If you don't recognize this activity, please:</p>
-      <ul>
-        <li>Change your password immediately</li>
-        <li>Review your account settings</li>
-        <li>Contact our support team</li>
-      </ul>
-      <p>Best regards,<br>The Team</p>
-    `;
-
-    const text = `
-      Security Alert
-      
-      Hello ${name},
-      
-      We detected unusual activity on your account.
-      
-      Alert Type: ${alertType}
-      Details: ${details}
-      
-      If this was you, no action is required. If you don't recognize this activity, please:
-      - Change your password immediately
-      - Review your account settings
-      - Contact our support team
-      
-      Best regards,
-      The Team
-    `;
-
-    await this.sendEmail({
-      to,
-      subject: 'Security Alert',
-      html,
-      text,
-    });
-  }
-
-  async renderTemplate(templateName: string, context: Record<string, unknown>): Promise<EmailTemplate> {
-    // This is a basic implementation - in a real app you might use a template engine like Handlebars
-    // For now, we'll return a basic template
-    return {
-      subject: `Template: ${templateName}`,
-      html: `<h1>Template: ${templateName}</h1><pre>${JSON.stringify(context, null, 2)}</pre>`,
-      text: `Template: ${templateName}\n\n${JSON.stringify(context, null, 2)}`,
-    };
-  }
-
-  async testConnection(): Promise<boolean> {
-    try {
-      await this.transporter.verify();
-      return true;
-    } catch {
-      return false;
-    }
+    await this.sendEmail(to, subject, html);
   }
 }
