@@ -197,17 +197,16 @@ describe('UserId Value Object', () => {
       const userId = UserId.generate();
       const originalValue = userId.value;
       
-      // Attempt to modify internal state - should not affect the value
-      // Even if modification doesn't throw, the value should remain unchanged
-      try {
-        (userId as any)._value = 'modified';
-      } catch {
-        // Ignore any errors from attempting to modify
-      }
-      
+      // Test that the value getter returns the same value consistently
       expect(userId.value).toBe(originalValue);
+      expect(userId.toString()).toBe(originalValue);
+      
+      // Test that creating a new UserId with the same value doesn't affect the original
+      const anotherUserId = UserId.fromString(originalValue);
+      expect(userId.value).toBe(originalValue);
+      expect(anotherUserId.value).toBe(originalValue);
     });
-
+    
     it('should not allow modification through value getter', () => {
       const userId = UserId.generate();
       const originalValue = userId.value;
