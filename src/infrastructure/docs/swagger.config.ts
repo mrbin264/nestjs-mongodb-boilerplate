@@ -7,17 +7,12 @@ export class SwaggerConfig {
       .setTitle('Boilerplate API')
       .setDescription('NestJS Authentication and User Management API')
       .setVersion('1.0')
-      .addBearerAuth(
-        {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
-          name: 'JWT',
-          description: 'Enter JWT token',
-          in: 'header',
-        },
-        'JWT-auth',
-      )
+      .addBearerAuth()
+      .addSecurity('bearer', {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      })
       .addTag('auth', 'Authentication endpoints')
       .addTag('users', 'User management endpoints')
       .addTag('profile', 'User profile endpoints')
