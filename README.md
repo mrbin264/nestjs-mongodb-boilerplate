@@ -97,6 +97,10 @@ Copy `.env.template` to `.env.development` and configure:
 | `JWT_EXPIRES_IN` | JWT expiration time | `15m` |
 | `REFRESH_TOKEN_SECRET` | Refresh token secret | `change-in-production` |
 | `REFRESH_TOKEN_EXPIRES_IN` | Refresh token expiration | `7d` |
+| `EMAIL_VERIFICATION_SECRET` | Email verification token secret | *falls back to JWT_SECRET* |
+| `EMAIL_VERIFICATION_EXPIRES_IN` | Email verification expiration | `24h` |
+| `PASSWORD_RESET_SECRET` | Password reset token secret | *falls back to JWT_SECRET* |
+| `PASSWORD_RESET_EXPIRES_IN` | Password reset expiration | `1h` |
 | `BCRYPT_SALT_ROUNDS` | Password hashing rounds | `12` |
 
 ## 🧪 Testing
@@ -186,7 +190,160 @@ pnpm run format
 - **Middleware**: Request/response processing
 - **Filters**: Exception handling
 
-## 🔐 Security Features
+## � Token Service Architecture
+
+The application implements a dual-service approach for token management, following Clean Architecture principles:
+
+### Service Separation
+
+#### 1. Domain Layer - `IJwtService`
+```typescript
+// domain/services/jwt.service.interface.ts
+interface IJwtService {
+  generateTokenPair(userId: UserId, email: string, roles: string[]): TokenPair;
+  generateAccessToken(userId: UserId, email: string, roles: string[]): string;
+  generateRefreshToken(userId: UserId, email: string, roles: string[]): string;
+  verifyAccessToken(token: string): JwtPayload;
+  verifyRefreshToken(token: string): JwtPayload;
+}
+```
+
+**Implementation**: `infrastructure/external-services/jwt/jwt.service.ts`
+**Purpose**: Core JWT operations for authentication and authorization
+
+#### 2. Application Layer - `ITokenService`
+```typescript
+// application/interfaces/token.service.interface.ts
+interface ITokenService {
+  generateAccessToken(payload: TokenPayload): string;
+  generateRefreshToken(payload: TokenPayload): string;
+  generateEmailVerificationToken(payload: EmailVerificationPayload): string;
+  generatePasswordResetToken(payload: PasswordResetPayload): string;
+  verifyEmailVerificationToken(token: string): Promise<EmailVerificationPayload>;
+  verifyPasswordResetToken(token: string): Promise<PasswordResetPayload>;
+}
+```
+
+**Implementation**: `infrastructure/external-services/token/token.service.ts`
+**Purpose**: Application-specific token operations (email verification, password reset)
+
+### Architecture Benefits
+
+| Aspect | Domain `IJwtService` | Application `ITokenService` |
+|--------|---------------------|----------------------------|
+| **Responsibility** | Core JWT authentication | Application-specific tokens |
+| **Dependencies** | Domain entities only | Application DTOs and payloads |
+| **Token Types** | Access, Refresh | Email verification, Password reset |
+| **Layer** | Domain layer | Application layer |
+| **Reusability** | High (core JWT logic) | Application-specific |
+
+### Dependency Injection Configuration
+
+```typescript
+// infrastructure/infrastructure.module.ts
+providers: [
+  {
+    provide: JWT_SERVICE,
+    useClass: TokenService, // Application-layer token service
+  },
+],
+```
+
+### Usage Examples
+
+#### Domain Layer Usage (Core Authentication)
+```typescript
+// Direct IJwtService usage for core auth
+@Injectable()
+export class SomeAuthService {
+  constructor(private jwtService: IJwtService) {}
+  
+  createTokens(user: User) {
+    return this.jwtService.generateTokenPair(
+      user.id, 
+      user.email.value, 
+      user.roles.map(r => r.value)
+    );
+  }
+}
+```
+
+#### Application Layer Usage (Email Verification)
+```typescript
+// Use cases inject ITokenService for app-specific tokens
+@Injectable()
+export class RegisterUserUseCase {
+  constructor(
+    @Inject(JWT_SERVICE) private tokenService: ITokenService
+  ) {}
+  
+  async execute(dto: RegisterUserDto) {
+    // Generate email verification token
+    const verificationToken = this.tokenService.generateEmailVerificationToken({
+      userId: user.id.value,
+      email: user.email.value,
+    });
+  }
+}
+```
+
+### Token Types and Configuration
+
+| Token Type | Secret Config | Expiration Config | Use Case |
+|------------|---------------|-------------------|----------|
+| **Access Token** | `auth.jwtSecret` | `auth.jwtExpiresIn` (15m) | API authentication |
+| **Refresh Token** | `auth.refreshSecret` | `auth.refreshExpiresIn` (7d) | Token renewal |
+| **Email Verification** | `auth.emailVerificationSecret`* | `auth.emailVerificationExpiresIn` (24h) | Email verification |
+| **Password Reset** | `auth.passwordResetSecret`* | `auth.passwordResetExpiresIn` (1h) | Password reset |
+
+*\* Falls back to `auth.jwtSecret` if not specified*
+
+### Alternative Architecture Patterns
+
+This dual-service approach was chosen over alternatives:
+
+#### ❌ Single Unified Service
+```typescript
+// Not chosen - would violate single responsibility
+class UnifiedTokenService implements IJwtService, ITokenService {
+  // Too many responsibilities in one class
+}
+```
+
+#### ❌ Composition Pattern
+```typescript
+// Not chosen - adds unnecessary complexity
+class TokenService {
+  constructor(private jwtService: IJwtService) {}
+  // Wrapper around domain service
+}
+```
+
+#### ✅ Current Approach: Specialized Services
+- **Clear separation of concerns**
+- **Layer-specific interfaces**  
+- **Single responsibility principle**
+- **Easy to test and maintain**
+
+### Environment Configuration
+
+Add these variables to your `.env` file:
+
+```bash
+# Core JWT (required)
+JWT_SECRET=your-secret-key
+JWT_EXPIRES_IN=15m
+REFRESH_SECRET=your-refresh-secret
+REFRESH_EXPIRES_IN=7d
+
+# Application tokens (optional - falls back to JWT_SECRET)
+EMAIL_VERIFICATION_SECRET=your-email-verification-secret
+EMAIL_VERIFICATION_EXPIRES_IN=24h
+PASSWORD_RESET_SECRET=your-password-reset-secret
+PASSWORD_RESET_EXPIRES_IN=1h
+```
+
+## �🔐 Security Features
 
 - **Helmet**: Security headers
 - **Rate Limiting**: Request throttling
