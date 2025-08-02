@@ -46,7 +46,7 @@ export class ForgotPasswordUseCase {
     });
 
     // Send password reset email
-    await this.emailService.sendPasswordReset(
+    await this.emailService.sendPasswordResetEmail(
       user.email.value,
       resetToken,
       user.profile.firstName || 'User'

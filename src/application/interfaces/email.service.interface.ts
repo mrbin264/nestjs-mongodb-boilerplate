@@ -11,7 +11,7 @@ export interface IEmailService {
   /**
    * Send password reset email
    */
-  sendPasswordReset(
+  sendPasswordResetEmail(
     to: string,
     resetToken: string,
     userName?: string
